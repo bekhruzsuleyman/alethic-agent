@@ -1,0 +1,42 @@
+name: Build macOS Standalone Installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -e .
+          python3 -m pip install pyinstaller
+
+      - name: Build macOS .pkg and .dmg installers
+        run: |
+          chmod +x install_mac.sh uninstall_mac.sh deploy/39_build_agent_mac.sh
+          bash deploy/39_build_agent_mac.sh
+
+      - name: Upload macOS installers to Release v0.1.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view v0.1.0 >/dev/null 2>&1; then
+            gh release create v0.1.0 --title "v0.1.0" --notes "Alethic Agent standalone installers"
+          fi
+          gh release upload v0.1.0 \
+            dist/alethic-agent-macos.pkg \
+            dist/alethic-agent-macos.dmg \
+            --clobber

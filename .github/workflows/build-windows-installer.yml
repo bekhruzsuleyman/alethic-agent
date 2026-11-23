@@ -1,0 +1,43 @@
+name: Build Windows Standalone Installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Create venv and install dependencies
+        shell: cmd
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          .venv\Scripts\python.exe -m pip install -e .
+          .venv\Scripts\python.exe -m pip install pyinstaller
+
+      - name: Build Windows standalone installer
+        shell: cmd
+        run: call deploy\21_build_agent_exe.bat /quiet
+
+      - name: Upload Windows installer to Release v0.1.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v0.1.0 *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create v0.1.0 --title "v0.1.0" --notes "Alethic Agent standalone installers"
+          }
+          gh release upload v0.1.0 dist/alethic-agent-setup.exe --clobber
